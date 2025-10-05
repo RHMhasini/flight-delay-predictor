@@ -256,7 +256,7 @@ def preprocess_input(airline_code, flight_num, origin, dest, dep_time, arr_time,
     return df
 
 # Sidebar navigation
-page = st.sidebar.radio("Navigation", ["Prediction", "Model Performance", "Prediction History"])
+page = st.sidebar.radio("Navigation", ["Prediction", "Prediction History"])
 
 if page == "Prediction":
     # Sidebar - User Inputs
@@ -481,29 +481,6 @@ PREDICTIONS:
             st.metric("Available Airlines", len(airlines_df))
         with col2:
             st.metric("Available Airports", len(airports_df))
-
-elif page == "Model Performance":
-    st.header("📈 Model Performance Metrics")
-    
-    if model_metrics:
-        st.plotly_chart(create_metrics_comparison(model_metrics), use_container_width=True)
-        
-        st.markdown("---")
-        st.subheader("Detailed Metrics")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("### XGBoost")
-            for metric, value in model_metrics['XGBoost'].items():
-                st.metric(metric.replace('_', ' ').title(), f"{value*100:.2f}%")
-        
-        with col2:
-            st.markdown("### Logistic Regression")
-            for metric, value in model_metrics['Logistic_Regression'].items():
-                st.metric(metric.replace('_', ' ').title(), f"{value*100:.2f}%")
-    else:
-        st.warning("Model metrics not available. Please export model_metrics.json from your training notebook.")
 
 elif page == "Prediction History":
     st.header("📝 Prediction History")
