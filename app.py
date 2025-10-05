@@ -166,35 +166,6 @@ def create_feature_importance_chart(feature_data, top_n=10):
     
     return fig
 
-def create_metrics_comparison(metrics_data):
-    """Create grouped bar chart for model metrics"""
-    models = list(metrics_data.keys())
-    metrics = ['accuracy', 'precision', 'recall', 'f1_score']
-    
-    fig = go.Figure()
-    
-    for metric in metrics:
-        values = [metrics_data[model][metric] * 100 for model in models]
-        fig.add_trace(go.Bar(
-            name=metric.replace('_', ' ').title(),
-            x=models,
-            y=values,
-            text=[f"{v:.1f}%" for v in values],
-            textposition='auto',
-        ))
-    
-    fig.update_layout(
-        title="Model Performance Metrics",
-        xaxis_title="Model",
-        yaxis_title="Score (%)",
-        yaxis=dict(range=[0, 100]),
-        barmode='group',
-        height=400,
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-    )
-    
-    return fig
-
 def create_csv_export(flight_info, predictions):
     """Create CSV data for export"""
     data = {
@@ -225,8 +196,10 @@ def preprocess_input(airline_code, flight_num, origin, dest, dep_time, arr_time,
     
     dep_hour = dep_time.hour
     time_block = get_time_block(dep_hour)
-    crs_dep_time = dep_hour + (dep_time.minute / 60)
-    crs_arr_time = arr_time.hour + (arr_time.minute / 60)
+    
+    # CRITICAL FIX: Use HHMM format to match training data
+    crs_dep_time = dep_time.hour * 100 + dep_time.minute  # e.g., 1430 for 2:30 PM
+    crs_arr_time = arr_time.hour * 100 + arr_time.minute  # e.g., 1700 for 5:00 PM
     
     distance_cat = get_distance_category(distance)
     
