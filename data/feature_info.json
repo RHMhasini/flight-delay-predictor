@@ -1,0 +1,35 @@
+{
+  "features": [
+    "AIRLINE_CODE",
+    "FL_NUMBER",
+    "ORIGIN",
+    "DEST",
+    "CRS_DEP_TIME",
+    "CRS_ARR_TIME",
+    "CRS_ELAPSED_TIME",
+    "DISTANCE",
+    "DAY_OF_WEEK",
+    "MONTH",
+    "IS_WEEKEND",
+    "DEP_HOUR",
+    "TIME_BLOCK",
+    "DISTANCE_CAT"
+  ],
+  "distance_min": -1.3263643631986435,
+  "distance_max": 8.48580408547852,
+  "dep_hour_min": 0,
+  "dep_hour_max": 23,
+  "time_blocks": {
+    "Early Morning (12am-6am)": 0,
+    "Morning (6am-12pm)": 1,
+    "Afternoon (12pm-6pm)": 2,
+    "Evening (6pm-10pm)": 3,
+    "Night (10pm-12am)": 4
+  },
+  "distance_categories": {
+    "Short (0-500 mi)": 0,
+    "Medium (500-1000 mi)": 1,
+    "Long (1000-2000 mi)": 2,
+    "Very Long (2000+ mi)": 3
+  }
+}
