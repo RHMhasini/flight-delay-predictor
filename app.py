@@ -17,7 +17,7 @@ st.set_page_config(
 
 # Title
 st.title("✈️ Flight Delay Prediction System")
-st.markdown("Predict flight delays using Machine Learning models")
+st.markdown("Predict flight delays using Machine Learning")
 st.markdown("---")
 
 # Load models and data
@@ -25,16 +25,16 @@ st.markdown("---")
 def load_models():
     with open('models/xgboost_model.pkl', 'rb') as f:
         xgb_model = pickle.load(f)
-    with open('models/logistic_model.pkl', 'rb') as f:
-        log_data = pickle.load(f)
     with open('models/label_encoders.pkl', 'rb') as f:
         label_encoders = pickle.load(f)
-    return xgb_model, log_data, label_encoders
+    return xgb_model, label_encoders
 
 @st.cache_data
 def load_data():
     airlines = pd.read_csv('data/airlines.csv')
     airports = pd.read_csv('data/airports.csv')
+    distance_lookup = pd.read_csv('data/distance_lookup.csv')
+    
     with open('data/feature_info.json', 'r') as f:
         feature_info = json.load(f)
     
@@ -51,11 +51,11 @@ def load_data():
     except:
         feature_importance = None
     
-    return airlines, airports, feature_info, model_metrics, feature_importance
+    return airlines, airports, distance_lookup, feature_info, model_metrics, feature_importance
 
 # Load everything
-xgb_model, log_data, label_encoders = load_models()
-airlines_df, airports_df, feature_info, model_metrics, feature_importance = load_data()
+xgb_model, label_encoders = load_models()
+airlines_df, airports_df, distance_lookup_df, feature_info, model_metrics, feature_importance = load_data()
 
 # Initialize session state for prediction history
 if 'prediction_history' not in st.session_state:
@@ -83,6 +83,16 @@ def get_distance_category(distance):
         return 'medium'
     else:
         return 'long'
+
+def get_route_distance(origin, dest):
+    """Get distance for a specific route from lookup table"""
+    route = distance_lookup_df[
+        (distance_lookup_df['ORIGIN'] == origin) & 
+        (distance_lookup_df['DEST'] == dest)
+    ]
+    if not route.empty:
+        return int(route.iloc[0]['DISTANCE'])
+    return None
 
 def create_gauge_chart(value, title):
     """Create a gauge chart for confidence score"""
@@ -113,34 +123,6 @@ def create_gauge_chart(value, title):
     fig.update_layout(height=250, margin=dict(l=10, r=10, t=50, b=10))
     return fig
 
-def create_confidence_comparison(predictions):
-    """Create bar chart comparing model confidences"""
-    models = list(predictions.keys())
-    confidences = [predictions[m]['confidence'] for m in models]
-    
-    colors = ['#3498db' if predictions[m]['result'] == 'ON-TIME' else '#e74c3c' for m in models]
-    
-    fig = go.Figure(data=[
-        go.Bar(
-            x=models,
-            y=confidences,
-            marker_color=colors,
-            text=[f"{c:.1f}%" for c in confidences],
-            textposition='auto',
-        )
-    ])
-    
-    fig.update_layout(
-        title="Model Confidence Comparison",
-        xaxis_title="Model",
-        yaxis_title="Confidence (%)",
-        yaxis=dict(range=[0, 100]),
-        height=300,
-        showlegend=False
-    )
-    
-    return fig
-
 def create_feature_importance_chart(feature_data, top_n=10):
     """Create horizontal bar chart for feature importance"""
     df = pd.DataFrame({
@@ -166,7 +148,7 @@ def create_feature_importance_chart(feature_data, top_n=10):
     
     return fig
 
-def create_csv_export(flight_info, predictions):
+def create_csv_export(flight_info, prediction):
     """Create CSV data for export"""
     data = {
         'Airline': [flight_info['airline']],
@@ -177,12 +159,10 @@ def create_csv_export(flight_info, predictions):
         'Departure_Time': [flight_info['dep_time']],
         'Arrival_Time': [flight_info['arr_time']],
         'Duration_Minutes': [flight_info['duration']],
-        'Distance_Miles': [flight_info['distance']]
+        'Distance_Miles': [flight_info['distance']],
+        'Prediction': [prediction['result']],
+        'Confidence': [f"{prediction['confidence']:.1f}%"]
     }
-    
-    for model_name, pred_info in predictions.items():
-        data[f'{model_name}_Prediction'] = [pred_info['result']]
-        data[f'{model_name}_Confidence'] = [f"{pred_info['confidence']:.1f}%"]
     
     return pd.DataFrame(data)
 
@@ -197,9 +177,8 @@ def preprocess_input(airline_code, flight_num, origin, dest, dep_time, arr_time,
     dep_hour = dep_time.hour
     time_block = get_time_block(dep_hour)
     
-    # CRITICAL FIX: Use HHMM format to match training data
-    crs_dep_time = dep_time.hour * 100 + dep_time.minute  # e.g., 1430 for 2:30 PM
-    crs_arr_time = arr_time.hour * 100 + arr_time.minute  # e.g., 1700 for 5:00 PM
+    crs_dep_time = dep_time.hour * 100 + dep_time.minute
+    crs_arr_time = arr_time.hour * 100 + arr_time.minute
     
     distance_cat = get_distance_category(distance)
     
@@ -242,11 +221,42 @@ if page == "Prediction":
     flight_date = st.sidebar.date_input("Flight Date", datetime.now())
 
     airports_sorted = airports_df.sort_values('AIRPORT_NAME')
-    origin_name = st.sidebar.selectbox("Origin Airport", airports_sorted['AIRPORT_NAME'].values)
+    origin_name = st.sidebar.selectbox("Origin Airport", airports_sorted['AIRPORT_NAME'].values, key='origin')
     origin_code = airports_df[airports_df['AIRPORT_NAME'] == origin_name]['AIRPORT_CODE'].values[0]
 
-    dest_name = st.sidebar.selectbox("Destination Airport", airports_sorted['AIRPORT_NAME'].values)
+    dest_name = st.sidebar.selectbox("Destination Airport", airports_sorted['AIRPORT_NAME'].values, key='dest')
     dest_code = airports_df[airports_df['AIRPORT_NAME'] == dest_name]['AIRPORT_CODE'].values[0]
+
+    # Auto-fill distance when airports are selected
+    expected_distance = get_route_distance(origin_code, dest_code)
+    
+    if expected_distance is not None:
+        default_distance = expected_distance
+        distance_help = f"Auto-filled: {expected_distance} miles for this route"
+    else:
+        default_distance = 1000
+        distance_help = "⚠️ Route not found in database. Please enter distance manually."
+    
+    distance = st.sidebar.number_input(
+        "Distance (miles)", 
+        min_value=0, 
+        max_value=5000, 
+        value=default_distance,
+        help=distance_help
+    )
+    
+    # Validate distance if we have expected value
+    distance_warning = ""
+    if expected_distance is not None and distance != expected_distance:
+        tolerance = 0.20  # 20% tolerance
+        min_distance = expected_distance * (1 - tolerance)
+        max_distance = expected_distance * (1 + tolerance)
+        
+        if distance < min_distance or distance > max_distance:
+            distance_warning = f"⚠️ Distance seems unusual. Expected ~{expected_distance} miles for this route."
+            st.sidebar.warning(distance_warning)
+        elif distance != expected_distance:
+            st.sidebar.info(f"ℹ️ Modified from expected {expected_distance} miles")
 
     dep_time = st.sidebar.time_input("Departure Time", time(14, 30))
     arr_time = st.sidebar.time_input("Arrival Time", time(17, 0))
@@ -270,13 +280,9 @@ if page == "Prediction":
     else:
         st.sidebar.success(f"✓ Flight duration: {elapsed_minutes // 60}h {elapsed_minutes % 60}m")
 
-    distance = st.sidebar.number_input("Distance (miles)", min_value=0, max_value=5000, value=1000)
-
     if origin_code == dest_code:
         is_valid_flight = False
         st.sidebar.error("❌ Origin and destination airports cannot be the same.")
-
-    model_choice = st.sidebar.selectbox("Select Model", ["XGBoost", "Logistic Regression", "Both Models"])
 
     predict_button = st.sidebar.button("🔮 Predict Delay", type="primary", disabled=not is_valid_flight)
 
@@ -305,64 +311,31 @@ if page == "Prediction":
         
         st.markdown("---")
         
-        all_predictions = {}
+        # XGBoost Prediction
+        st.subheader("🤖 XGBoost Prediction")
+        xgb_pred = xgb_model.predict(input_df)[0]
+        xgb_proba = xgb_model.predict_proba(input_df)[0]
+        xgb_result = "DELAYED" if xgb_pred == 1 else "ON-TIME"
+        xgb_confidence = xgb_proba[1] if xgb_pred == 1 else xgb_proba[0]
         
-        if model_choice == "XGBoost" or model_choice == "Both Models":
-            st.subheader("XGBoost Prediction")
-            xgb_pred = xgb_model.predict(input_df)[0]
-            xgb_proba = xgb_model.predict_proba(input_df)[0]
-            xgb_result = "DELAYED" if xgb_pred == 1 else "ON-TIME"
-            xgb_confidence = xgb_proba[1] if xgb_pred == 1 else xgb_proba[0]
-            
-            all_predictions['XGBoost'] = {
-                'result': xgb_result,
-                'confidence': xgb_confidence * 100
-            }
-            
-            col1, col2 = st.columns([1, 2])
-            with col1:
-                if xgb_result == "DELAYED":
-                    st.error(f"🔴 {xgb_result}")
-                else:
-                    st.success(f"🟢 {xgb_result}")
-            with col2:
-                st.plotly_chart(create_gauge_chart(xgb_confidence * 100, "Confidence"), use_container_width=True)
-            
-            if model_choice != "Both Models":
-                st.markdown("---")
+        prediction_data = {
+            'result': xgb_result,
+            'confidence': xgb_confidence * 100
+        }
         
-        if model_choice == "Logistic Regression" or model_choice == "Both Models":
-            st.subheader("Logistic Regression Prediction")
-            input_scaled = log_data['scaler'].transform(input_df)
-            log_pred = log_data['model'].predict(input_scaled)[0]
-            log_proba = log_data['model'].predict_proba(input_scaled)[0]
-            log_result = "DELAYED" if log_pred == 1 else "ON-TIME"
-            log_confidence = log_proba[1] if log_pred == 1 else log_proba[0]
-            
-            all_predictions['Logistic_Regression'] = {
-                'result': log_result,
-                'confidence': log_confidence * 100
-            }
-            
-            col1, col2 = st.columns([1, 2])
-            with col1:
-                if log_result == "DELAYED":
-                    st.error(f"🔴 {log_result}")
-                else:
-                    st.success(f"🟢 {log_result}")
-            with col2:
-                st.plotly_chart(create_gauge_chart(log_confidence * 100, "Confidence"), use_container_width=True)
-        
-        # Confidence comparison if both models
-        if len(all_predictions) > 1:
-            st.markdown("---")
-            st.subheader("📊 Model Comparison")
-            st.plotly_chart(create_confidence_comparison(all_predictions), use_container_width=True)
+        col1, col2 = st.columns([1, 2])
+        with col1:
+            if xgb_result == "DELAYED":
+                st.error(f"🔴 **{xgb_result}**")
+            else:
+                st.success(f"🟢 **{xgb_result}**")
+        with col2:
+            st.plotly_chart(create_gauge_chart(xgb_confidence * 100, "Confidence Score"), use_container_width=True)
         
         # Feature importance
         if feature_importance:
             st.markdown("---")
-            st.subheader("🔍 Feature Importance")
+            st.subheader("🔍 Feature Importance Analysis")
             st.plotly_chart(create_feature_importance_chart(feature_importance), use_container_width=True)
         
         # Add to prediction history
@@ -370,7 +343,8 @@ if page == "Prediction":
             'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             'flight': f"{airline_code}{flight_number}",
             'route': f"{origin_name} → {dest_name}",
-            'predictions': all_predictions
+            'result': xgb_result,
+            'confidence': xgb_confidence * 100
         }
         st.session_state.prediction_history.insert(0, history_entry)
         if len(st.session_state.prediction_history) > 10:
@@ -395,7 +369,7 @@ if page == "Prediction":
         col1, col2 = st.columns(2)
         
         with col1:
-            csv_data = create_csv_export(flight_info, all_predictions)
+            csv_data = create_csv_export(flight_info, prediction_data)
             csv_buffer = BytesIO()
             csv_data.to_csv(csv_buffer, index=False)
             csv_buffer.seek(0)
@@ -421,16 +395,14 @@ FLIGHT INFORMATION:
   Duration: {elapsed_minutes // 60}h {elapsed_minutes % 60}m
   Distance: {distance} miles
 
-PREDICTIONS:
+PREDICTION:
 {'='*50}
+  Result: {xgb_result}
+  Confidence: {xgb_confidence * 100:.1f}%
+
+{'='*50}
+Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 """
-            for model_name, pred_info in all_predictions.items():
-                text_report += f"\n{model_name.replace('_', ' ')}:\n"
-                text_report += f"  Result: {pred_info['result']}\n"
-                text_report += f"  Confidence: {pred_info['confidence']:.1f}%\n"
-            
-            text_report += f"\n{'='*50}\n"
-            text_report += f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
             
             st.download_button(
                 label="📄 Download as TXT",
@@ -443,17 +415,19 @@ PREDICTIONS:
         st.info("👈 Fill in the flight details and click 'Predict Delay' to get started!")
         
         st.subheader("About This App")
-        st.write("This app uses Machine Learning to predict flight delays based on:")
-        st.write("- Airline and route information")
-        st.write("- Departure time and date")
-        st.write("- Flight distance and duration")
-        st.write("- Historical delay patterns")
+        st.write("This app uses XGBoost Machine Learning to predict flight delays based on:")
+        st.write("- ✈️ Airline and route information")
+        st.write("- 🕒 Departure time and date")
+        st.write("- 📏 Flight distance and duration")
+        st.write("- 📊 Historical delay patterns")
         
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
         with col1:
             st.metric("Available Airlines", len(airlines_df))
         with col2:
             st.metric("Available Airports", len(airports_df))
+        with col3:
+            st.metric("Known Routes", len(distance_lookup_df))
 
 elif page == "Prediction History":
     st.header("📝 Prediction History")
@@ -461,10 +435,16 @@ elif page == "Prediction History":
     if st.session_state.prediction_history:
         for i, entry in enumerate(st.session_state.prediction_history):
             with st.expander(f"{entry['timestamp']} - {entry['flight']} ({entry['route']})"):
-                for model, pred in entry['predictions'].items():
-                    st.write(f"**{model}:** {pred['result']} (Confidence: {pred['confidence']:.1f}%)")
+                col1, col2 = st.columns(2)
+                with col1:
+                    if entry['result'] == "DELAYED":
+                        st.error(f"🔴 **{entry['result']}**")
+                    else:
+                        st.success(f"🟢 **{entry['result']}**")
+                with col2:
+                    st.metric("Confidence", f"{entry['confidence']:.1f}%")
         
-        if st.button("Clear History"):
+        if st.button("🗑️ Clear History"):
             st.session_state.prediction_history = []
             st.rerun()
     else:
