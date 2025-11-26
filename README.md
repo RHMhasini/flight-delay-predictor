@@ -15,42 +15,26 @@ Flight Delay Predictor uses an XGBoost model to forecast flight delays based on 
 - Input validation and auto-fill features
 
 ## Project Structure
-flight-delay-predictor/
-├── app.py                     # Main Streamlit application
-
-├── test_model.py              # Model testing script
-
-├── requirements.txt           # Python dependencies
-
-├── .gitignore                 # Git ignore rules
-
-├── colab_code/
-
-│   └── colab_code.py          # Complete ML pipeline (data processing, training, evaluation)
-
-├── models/
-
-│   ├── xgboost_model.pkl      # Trained XGBoost model
-
-│   ├── logistic_model.pkl     # Trained Logistic Regression model (with scaler)
-
-│   └── label_encoders.pkl     # Label encoders for categorical features
-
-└── data/
-
-    ├── airlines.csv           # Airline code to name mapping
-    
-    ├── airports.csv           # Airport code to name mapping
-    
-    ├── distance_lookup.csv    # Route distance lookup table
-    
-    ├── feature_info.json      # Feature statistics and metadata
-    
-    ├── feature_importance.json# Feature importance scores
-    
-    ├── feature_names.txt      # List of all features
-    
-    └── model_metrics.json     # Model performance metrics
+| **Directory / File**           | **Type**  | **Description**                                         |
+| ------------------------------ | --------- | ------------------------------------------------------- |
+| `app.py`                       | File      | Main Streamlit web application                          |
+| `test_model.py`                | File      | Script to test models and data loading                  |
+| `requirements.txt`             | File      | Python dependencies                                     |
+| `.gitignore`                   | File      | Git ignore rules                                        |
+| `colab_code/`                  | Directory | Contains full ML pipeline for training and evaluation   |
+| `colab_code/colab_code.py`     | File      | Data preprocessing, feature engineering, model training |
+| `models/`                      | Directory | Stores trained models and encoders                      |
+| `models/xgboost_model.pkl`     | File      | Trained XGBoost classifier                              |
+| `models/logistic_model.pkl`    | File      | Trained Logistic Regression model (with scaler)         |
+| `models/label_encoders.pkl`    | File      | Saved label encoders for categorical features           |
+| `data/`                        | Directory | Contains supporting data files                          |
+| `data/airlines.csv`            | File      | Airline code to name mapping                            |
+| `data/airports.csv`            | File      | Airport code to name mapping                            |
+| `data/distance_lookup.csv`     | File      | Route distance lookup table                             |
+| `data/feature_info.json`       | File      | Feature statistics and metadata                         |
+| `data/feature_importance.json` | File      | Feature importance scores                               |
+| `data/feature_names.txt`       | File      | List of all features                                    |
+| `data/model_metrics.json`      | File      | Model performance metrics                               |
 
 
 
