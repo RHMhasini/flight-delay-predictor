@@ -15,7 +15,43 @@ Flight Delay Predictor uses an XGBoost model to forecast flight delays based on 
 - Input validation and auto-fill features
 
 ## Project Structure
-flight-delay-predictor/ ├── app.py # Main Streamlit application ├── test_model.py # Model testing script ├── requirements.txt # Python dependencies ├── .gitignore # Git ignore rules ├── colab_code/ │ └── colab_code.py # Complete ML pipeline (data processing, training, evaluation) ├── models/ │ ├── xgboost_model.pkl # Trained XGBoost model │ ├── logistic_model.pkl # Trained Logistic Regression model (with scaler) │ └── label_encoders.pkl # Label encoders for categorical features └── data/ ├── airlines.csv # Airline code to name mapping ├── airports.csv # Airport code to name mapping ├── distance_lookup.csv # Route distance lookup table ├── feature_info.json # Feature statistics and metadata ├── feature_importance.json # Feature importance scores ├── feature_names.txt # List of all features └── model_metrics.json # Model performance metrics
+flight-delay-predictor/
+├── app.py                     # Main Streamlit application
+
+├── test_model.py              # Model testing script
+
+├── requirements.txt           # Python dependencies
+
+├── .gitignore                 # Git ignore rules
+
+├── colab_code/
+
+│   └── colab_code.py          # Complete ML pipeline (data processing, training, evaluation)
+
+├── models/
+
+│   ├── xgboost_model.pkl      # Trained XGBoost model
+
+│   ├── logistic_model.pkl     # Trained Logistic Regression model (with scaler)
+
+│   └── label_encoders.pkl     # Label encoders for categorical features
+
+└── data/
+
+    ├── airlines.csv           # Airline code to name mapping
+    
+    ├── airports.csv           # Airport code to name mapping
+    
+    ├── distance_lookup.csv    # Route distance lookup table
+    
+    ├── feature_info.json      # Feature statistics and metadata
+    
+    ├── feature_importance.json# Feature importance scores
+    
+    ├── feature_names.txt      # List of all features
+    
+    └── model_metrics.json     # Model performance metrics
+
 
 
 ## Data Processing
